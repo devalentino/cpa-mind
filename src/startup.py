@@ -59,6 +59,7 @@ def startup():
             TerraleadsOfferParserStrategy(
                 login=os.getenv("TERRALEADS_LOGIN", ""),
                 password=os.getenv("TERRALEADS_PASSWORD", ""),
+                cache_path=os.getenv("PLAYWRIGHT_CACHE_PATH"),
             ),
             UnsupportedOfferParserStrategy(),
         )
