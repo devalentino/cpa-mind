@@ -16,6 +16,7 @@ from tools.cpa.base import OfferParserStrategy
 
 class TerraleadsOfferParserStrategy(OfferParserStrategy):
     platform_name = "terraleads"
+    state_file_name = "terraleads_playwrite_state.json"
 
     def __init__(
         self,
@@ -25,7 +26,7 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
     ) -> None:
         self._login = login
         self._password = password
-        self._cache_path = Path(cache_path).expanduser() if cache_path else None
+        self._cache_dir = Path(cache_path).expanduser() if cache_path else None
 
     def supports(self, offer_url: str) -> bool:
         hostname = urlparse(offer_url).netloc.lower()
@@ -43,9 +44,9 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
                 page.goto(offer_url, wait_until="domcontentloaded")
                 page.wait_for_load_state("networkidle")
 
-                if self._is_login_page(page):
+                if self._is_unauthenticated_index_page(page):
                     self._authenticate(page)
-                    self._save_storage_state(browser_context)
+                    self._save_playwright_storage_state(browser_context)
 
                 offer_markdown = self._parse_offer_page(page, offer_url)
             finally:
@@ -54,8 +55,9 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
         return offer_markdown
 
     def _new_browser_context(self, browser: Browser) -> BrowserContext:
-        if self._cache_path and self._cache_path.exists():
-            return browser.new_context(storage_state=str(self._cache_path))
+        state_file = self._playwright_state_file_path()
+        if state_file and state_file.exists():
+            return browser.new_context(storage_state=str(state_file))
         return browser.new_context()
 
     def _validate_credentials(self) -> None:
@@ -65,30 +67,29 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
     def _authenticate(self, page: Page) -> None:
         login_url = "https://terraleads.com/login"
         page.goto(login_url, wait_until="domcontentloaded")
-        self._dismiss_cookie_banner(page)
         login_form = page.locator('form.auth__form[action="/acp/startup/login"]')
         login_form.locator('input[name="email"]').fill(self._login)
         login_form.locator('input[name="password"]').fill(self._password)
         login_form.locator('button[name="submit"]').click()
-        input("Please solve reCAPTCHA, then press Enter to continue...")
+        # input("Please solve reCAPTCHA, then press Enter to continue...")
         page.wait_for_load_state("networkidle")
         self._wait_for_authenticated_page(page)
 
-    def _save_storage_state(self, browser_context: BrowserContext) -> None:
-        if not self._cache_path:
+    def _save_playwright_storage_state(self, browser_context: BrowserContext) -> None:
+        state_file = self._playwright_state_file_path()
+        if not state_file:
             return
 
-        self._cache_path.parent.mkdir(parents=True, exist_ok=True)
-        browser_context.storage_state(path=str(self._cache_path))
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        browser_context.storage_state(path=str(state_file))
 
-    def _is_login_page(self, page: Page) -> bool:
-        return page.url.rstrip("/") == "https://terraleads.com/login"
+    def _playwright_state_file_path(self) -> Path | None:
+        if not self._cache_dir:
+            return None
+        return self._cache_dir / self.state_file_name
 
-    def _dismiss_cookie_banner(self, page: Page) -> None:
-        try:
-            page.get_by_role("button", name="OK").click(timeout=2_000)
-        except Exception:
-            return
+    def _is_unauthenticated_index_page(self, page: Page) -> bool:
+        return page.locator('a.promo__btn[href="/registration"]').count() > 0
 
     def _wait_for_authenticated_page(self, page: Page) -> None:
         expected_url = "https://terraleads.com/acp/dashboard/welcome"

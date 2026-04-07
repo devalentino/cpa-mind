@@ -85,9 +85,10 @@ def build_researcher_node(
         offer_url = state["offer_url"]
         traffic_source = state["traffic_source"]
         messages = list(state.get("messages", []))
+        initial_messages: list[SystemMessage | HumanMessage] = []
 
         if not messages:
-            messages = [
+            initial_messages = [
                 SystemMessage(
                     content=(
                         "You are the Researcher agent in a CPA marketing system. "
@@ -112,10 +113,11 @@ def build_researcher_node(
                     )
                 ),
             ]
+            messages = list(initial_messages)
 
         response = researcher_model.invoke(messages)
         state_update: AnalysisState = {
-            "messages": [response],
+            "messages": [*initial_messages, response],
             "revision_count": state.get("revision_count", 0),
             "max_revisions": state.get("max_revisions", 2),
         }
