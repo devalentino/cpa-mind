@@ -22,19 +22,19 @@ All tools are placeholders for now and return TODO-backed stub data.
 Set these environment variables in the runtime environment before running `analyze`:
 
 ```bash
+GEMINI_API_KEY=your_gemini_key
 OPENAI_API_KEY=your_openai_key
-GOOGLE_API_KEY=your_google_key
 
-RESEARCHER_LLM_PROVIDER=openai
-RESEARCHER_LLM_MODEL=gpt-4.1-mini
+RESEARCHER_LLM_PROVIDER=google
+RESEARCHER_LLM_MODEL=gemini-2.5-flash
 RESEARCHER_LLM_TEMPERATURE=0
 
 CREATOR_LLM_PROVIDER=google
 CREATOR_LLM_MODEL=gemini-2.5-flash
 CREATOR_LLM_TEMPERATURE=0.7
 
-COMPLIANCE_LLM_PROVIDER=openai
-COMPLIANCE_LLM_MODEL=gpt-4.1-mini
+COMPLIANCE_LLM_PROVIDER=google
+COMPLIANCE_LLM_MODEL=gemini-2.5-flash
 COMPLIANCE_LLM_TEMPERATURE=0
 
 TERRALEADS_LOGIN=your_terraleads_login

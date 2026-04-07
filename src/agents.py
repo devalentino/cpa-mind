@@ -132,6 +132,8 @@ def build_researcher_node(
         return state_update
 
     return researcher_node
+
+
 def build_research_tools_node(
     research_tools: list[BaseTool],
 ) -> Callable[[AnalysisState], AnalysisState]:
