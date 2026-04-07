@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 
-from llm import LLMConfig, RoleLLMConfig
-from workflow import run_analysis
+from startup import startup
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,36 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-
-    llm_config = LLMConfig(
-        researcher=RoleLLMConfig(
-            provider=os.getenv("RESEARCHER_LLM_PROVIDER", "openai"),
-            model=os.getenv("RESEARCHER_LLM_MODEL", "gpt-4.1-mini"),
-            temperature=float(os.getenv("RESEARCHER_LLM_TEMPERATURE", "0")),
-            api_key=os.getenv("RESEARCHER_LLM_API_KEY") or os.getenv("OPENAI_API_KEY"),
-        ),
-        creator=RoleLLMConfig(
-            provider=os.getenv("CREATOR_LLM_PROVIDER", "openai"),
-            model=os.getenv("CREATOR_LLM_MODEL", "gpt-4.1-mini"),
-            temperature=float(os.getenv("CREATOR_LLM_TEMPERATURE", "0.7")),
-            api_key=(
-                os.getenv("CREATOR_LLM_API_KEY")
-                or os.getenv("GOOGLE_API_KEY")
-                or os.getenv("OPENAI_API_KEY")
-            ),
-        ),
-        compliance_officer=RoleLLMConfig(
-            provider=os.getenv("COMPLIANCE_LLM_PROVIDER", "openai"),
-            model=os.getenv("COMPLIANCE_LLM_MODEL", "gpt-4.1-mini"),
-            temperature=float(os.getenv("COMPLIANCE_LLM_TEMPERATURE", "0")),
-            api_key=os.getenv("COMPLIANCE_LLM_API_KEY") or os.getenv("OPENAI_API_KEY"),
-        ),
-    )
-
-    result = run_analysis(
-        offer_url=args.offer_url,
-        traffic_source=args.traffic_source,
-        llm_config=llm_config,
+    app = startup()
+    result = app.invoke(
+        {
+            "offer_url": args.offer_url,
+            "traffic_source": args.traffic_source,
+        }
     )
     print(json.dumps(result, indent=2))
 

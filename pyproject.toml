@@ -19,7 +19,7 @@ analyze = "cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["agents", "cli", "llm", "state", "tools", "workflow"]
+py-modules = ["agents", "cli", "llm", "startup", "state", "tools", "workflow"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

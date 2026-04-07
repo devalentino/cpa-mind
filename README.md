@@ -17,9 +17,9 @@ LangGraph-based skeleton for a CPA multi-agent console application.
 
 All tools are placeholders for now and return TODO-backed stub data.
 
-## LLM Configuration
+## Startup Configuration
 
-Set these environment variables in the runtime environment:
+Set these environment variables in the runtime environment before running `analyze`:
 
 ```bash
 OPENAI_API_KEY=your_openai_key
@@ -36,9 +36,17 @@ CREATOR_LLM_TEMPERATURE=0.7
 COMPLIANCE_LLM_PROVIDER=openai
 COMPLIANCE_LLM_MODEL=gpt-4.1-mini
 COMPLIANCE_LLM_TEMPERATURE=0
+
+TERRALEADS_LOGIN=your_terraleads_login
+TERRALEADS_PASSWORD=your_terraleads_password
 ```
 
-The runtime configuration is assembled at the application boundary in [src/cli.py](/Users/valentyn/projects/cpa-mind/src/cli.py). The factory in [src/llm.py](/Users/valentyn/projects/cpa-mind/src/llm.py) then selects the concrete chat model by role, so `Researcher`, `Creator`, and `Compliance Officer` can use different providers and models.
+Application composition happens in [src/startup.py](/Users/valentyn/projects/cpa-mind/src/startup.py). At startup, the app:
+
+- builds the three role-specific chat models
+- builds the `OfferReader` with platform strategies such as Terraleads
+- builds the research tools with those ready dependencies
+- compiles the LangGraph workflow
 
 ## Run locally
 
@@ -54,7 +62,9 @@ analyze --offer-url https://example.com --traffic-source facebook
 The CLI runs a LangGraph workflow:
 
 1. `Researcher`
-2. `Creator`
-3. `Compliance Officer`
-4. Back to `Creator` if compliance requests revisions
-5. Finish when compliance approves or the revision limit is reached
+2. `Researcher` optionally calls only the tools it decides it needs
+3. End early if research blocks the offer, for example disabled/unavailable offers
+4. `Creator`
+5. `Compliance Officer`
+6. Back to `Creator` if compliance requests revisions
+7. Finish when compliance approves or the revision limit is reached

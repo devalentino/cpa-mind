@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
+from langchain_core.tools import BaseTool
 from langgraph.graph import END, START, StateGraph
 
-from llm import LLMConfig, RoleAwareChatModelFactory
 from agents import (
     build_compliance_officer_node,
     build_creator_node,
@@ -18,10 +18,11 @@ def build_graph(
     researcher_model: BaseChatModel,
     creator_model: BaseChatModel,
     compliance_officer_model: BaseChatModel,
+    research_tools: list[BaseTool],
 ):
     graph = StateGraph(AnalysisState)
-    graph.add_node("researcher", build_researcher_node(researcher_model))
-    graph.add_node("research_tools", build_research_tools_node())
+    graph.add_node("researcher", build_researcher_node(researcher_model, research_tools))
+    graph.add_node("research_tools", build_research_tools_node(research_tools))
     graph.add_node("creator", build_creator_node(creator_model))
     graph.add_node(
         "compliance_officer",
@@ -68,21 +69,3 @@ def route_after_compliance(state: AnalysisState) -> str:
         if state.get("revision_count", 0) < state.get("max_revisions", 2):
             return "creator"
     return "end"
-
-
-def run_analysis(
-    offer_url: str,
-    traffic_source: str,
-    llm_config: LLMConfig,
-) -> AnalysisState:
-    factory = RoleAwareChatModelFactory(llm_config)
-    app = build_graph(
-        researcher_model=factory.create_chat_model("researcher"),
-        creator_model=factory.create_chat_model("creator"),
-        compliance_officer_model=factory.create_chat_model("compliance_officer"),
-    )
-    initial_state: AnalysisState = {
-        "offer_url": offer_url,
-        "traffic_source": traffic_source,
-    }
-    return app.invoke(initial_state)

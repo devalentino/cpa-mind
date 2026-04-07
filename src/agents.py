@@ -1,25 +1,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict, is_dataclass
 from collections.abc import Callable
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.tools import BaseTool
 from state import AnalysisState
-from tools import (
-    facebook_ads_library_reader_tool,
-    google_trends_reader_tool,
-    landing_reader_tool,
-    offer_reader_tool,
-)
-
-RESEARCH_TOOLS = [
-    offer_reader_tool,
-    landing_reader_tool,
-    facebook_ads_library_reader_tool,
-    google_trends_reader_tool,
-]
-RESEARCH_TOOL_BY_NAME = {tool.name: tool for tool in RESEARCH_TOOLS}
 
 
 def _message_text(response: object) -> str:
@@ -35,6 +23,14 @@ def _message_text(response: object) -> str:
                 parts.append(str(item))
         return "\n".join(part for part in parts if part).strip()
     return str(content)
+
+
+def _tool_result_to_message_content(tool_result: object) -> str:
+    if is_dataclass(tool_result):
+        return json.dumps(asdict(tool_result), indent=2)
+    if isinstance(tool_result, (dict, list)):
+        return json.dumps(tool_result, indent=2)
+    return str(tool_result)
 
 
 def _parse_compliance_result(text: str) -> tuple[str, str]:
@@ -81,8 +77,9 @@ def _parse_research_result(text: str) -> tuple[str, str, str]:
 
 def build_researcher_node(
     model: BaseChatModel,
+    research_tools: list[BaseTool],
 ) -> Callable[[AnalysisState], AnalysisState]:
-    researcher_model = model.bind_tools(RESEARCH_TOOLS)
+    researcher_model = model.bind_tools(research_tools)
 
     def researcher_node(state: AnalysisState) -> AnalysisState:
         offer_url = state["offer_url"]
@@ -135,9 +132,11 @@ def build_researcher_node(
         return state_update
 
     return researcher_node
+def build_research_tools_node(
+    research_tools: list[BaseTool],
+) -> Callable[[AnalysisState], AnalysisState]:
+    research_tool_by_name = {tool.name: tool for tool in research_tools}
 
-
-def build_research_tools_node() -> Callable[[AnalysisState], AnalysisState]:
     def research_tools_node(state: AnalysisState) -> AnalysisState:
         messages = list(state.get("messages", []))
         if not messages:
@@ -152,7 +151,7 @@ def build_research_tools_node() -> Callable[[AnalysisState], AnalysisState]:
 
         for tool_call in last_message.tool_calls:
             tool_name = tool_call["name"]
-            tool = RESEARCH_TOOL_BY_NAME.get(tool_name)
+            tool = research_tool_by_name.get(tool_name)
             if tool is None:
                 raise ValueError(f"Unsupported research tool requested: {tool_name}")
 
@@ -160,7 +159,7 @@ def build_research_tools_node() -> Callable[[AnalysisState], AnalysisState]:
             tool_outputs[tool_name] = tool_result
             tool_messages.append(
                 ToolMessage(
-                    content=json.dumps(tool_result, indent=2),
+                    content=_tool_result_to_message_content(tool_result),
                     tool_call_id=tool_call["id"],
                     name=tool_name,
                 )
