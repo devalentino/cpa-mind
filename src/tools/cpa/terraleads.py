@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urljoin
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -11,7 +12,7 @@ from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
-from tools.cpa.base import OfferParserStrategy
+from tools.cpa.base import OfferParserStrategy, ParsedOffer
 
 
 class TerraleadsOfferParserStrategy(OfferParserStrategy):
@@ -32,7 +33,7 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
         hostname = urlparse(offer_url).netloc.lower()
         return "terraleads" in hostname
 
-    def parse_offer(self, offer_url: str) -> str:
+    def parse_offer(self, offer_url: str) -> ParsedOffer:
         self._validate_credentials()
 
         with sync_playwright() as playwright:
@@ -48,11 +49,11 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
                     self._authenticate(page)
                     self._save_playwright_storage_state(browser_context)
 
-                offer_markdown = self._parse_offer_page(page, offer_url)
+                parsed_offer = self._parse_offer_page(page, offer_url)
             finally:
                 browser.close()
 
-        return offer_markdown
+        return parsed_offer
 
     def _new_browser_context(self, browser: Browser) -> BrowserContext:
         state_file = self._playwright_state_file_path()
@@ -109,19 +110,19 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
         self,
         page: Page,
         offer_url: str,
-    ) -> str:
+    ) -> ParsedOffer:
         if page.url != offer_url:
             page.goto(offer_url, wait_until="domcontentloaded")
             page.wait_for_load_state("networkidle")
         raw_html = page.content()
         cleaned_html = self._extract_offer_wrap_html(raw_html)
         offer_markdown = self._html_to_markdown(cleaned_html)
-        title = page.title().strip()
-        return (
-            f"# {title}\n\n"
-            f"Source URL: {offer_url}\n\n"
-            f"{offer_markdown}"
-        ).strip()
+        prelanding_urls, landing_urls = self._extract_offer_links(raw_html, offer_url)
+        return ParsedOffer(
+            offer=offer_markdown,
+            landing_urls=landing_urls,
+            prelanding_urls=prelanding_urls,
+        )
 
     def _extract_offer_wrap_html(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
@@ -132,6 +133,9 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
         for tag_name in ("script", "style", "iframe", "noscript", "svg", "canvas"):
             for tag in offer_wrap.find_all(tag_name):
                 tag.decompose()
+
+        for tag in offer_wrap.select("table.creatives-table"):
+            tag.decompose()
 
         for tag in offer_wrap.find_all(attrs={"aria-hidden": "true"}):
             tag.decompose()
@@ -145,6 +149,41 @@ class TerraleadsOfferParserStrategy(OfferParserStrategy):
                 tag.decompose()
 
         return str(offer_wrap)
+
+    def _extract_offer_links(
+        self,
+        html: str,
+        offer_url: str,
+    ) -> tuple[list[str], list[str]]:
+        soup = BeautifulSoup(html, "html.parser")
+        landing_container = soup.select_one("div.datagrid-pre#land")
+        prelanding_container = soup.select_one("div.datagrid-pre#preland")
+
+        if landing_container is None and prelanding_container is None:
+            return [], []
+
+        landing_urls = self._extract_creative_urls(landing_container, offer_url)
+        prelanding_urls = self._extract_creative_urls(prelanding_container, offer_url)
+        return prelanding_urls, landing_urls
+
+    def _extract_creative_urls(
+        self,
+        container: BeautifulSoup | None,
+        offer_url: str,
+    ) -> list[str]:
+        if container is None:
+            return []
+
+        urls: list[str] = []
+        for link in container.select("td.creative__link a[href]"):
+            href = link["href"].strip()
+            if not href or href.startswith("#") or href.lower().startswith("javascript:"):
+                continue
+
+            if href not in urls:
+                urls.append(href)
+
+        return urls
 
     def _html_to_markdown(self, html: str) -> str:
         markdown = html_to_markdown(

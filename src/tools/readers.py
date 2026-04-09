@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -10,20 +9,8 @@ from playwright.sync_api import sync_playwright
 
 
 @dataclass(slots=True)
-class LandingReader:
-    def run(self, landing_url: str) -> dict[str, Any]:
-        return {
-            "landing_url": landing_url,
-            "summary": "TODO: implement landing content analysis.",
-            "search_terms": [
-                "TODO: extract localized competitor search terms from the landing content."
-            ],
-        }
-
-
-@dataclass(slots=True)
 class FacebookAdsLibraryReader:
-    def run(self, search_term: str, country: str) -> dict[str, Any]:
+    def run(self, search_term: str, country: str) -> str:
         ads_library_url = self._build_ads_library_url(search_term, country)
 
         with sync_playwright() as playwright:
@@ -80,7 +67,7 @@ class FacebookAdsLibraryReader:
 
 @dataclass(slots=True)
 class GoogleTrendsReader:
-    def run(self, offer_url: str) -> dict[str, Any]:
+    def run(self, offer_url: str) -> dict[str, str]:
         return {
             "offer_url": offer_url,
             "trend_summary": "TODO: implement Google Trends API lookup.",

@@ -4,6 +4,7 @@ import os
 
 from llm import build_chat_model
 from tools.cpa import (
+    LandingReader,
     OfferReader,
     TerraleadsOfferParserStrategy,
     UnsupportedOfferParserStrategy,
@@ -11,7 +12,6 @@ from tools.cpa import (
 from tools.factories import (
     build_facebook_ads_library_reader_tool,
     build_google_trends_reader_tool,
-    build_landing_reader_tool,
     build_offer_reader_tool,
 )
 from workflow import build_graph
@@ -69,12 +69,12 @@ def startup():
                 cache_path=os.getenv("CACHE_PATH"),
             ),
             UnsupportedOfferParserStrategy(),
-        )
+        ),
+        landing_reader=LandingReader(),
     )
 
     research_tools = [
         build_offer_reader_tool(offer_reader),
-        build_landing_reader_tool(),
         build_facebook_ads_library_reader_tool(),
         build_google_trends_reader_tool(),
     ]

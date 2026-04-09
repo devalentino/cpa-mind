@@ -11,7 +11,6 @@ LangGraph-based skeleton for a CPA multi-agent console application.
 ## Tools
 
 - `OfferReader`
-- `LandingReader`
 - `FacebookAdsLibraryReader`
 - `GoogleTrendsReader`
 
