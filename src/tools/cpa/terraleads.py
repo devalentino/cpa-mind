@@ -16,7 +16,7 @@ from tools.cpa.base import OfferParserStrategy
 
 class TerraleadsOfferParserStrategy(OfferParserStrategy):
     platform_name = "terraleads"
-    state_file_name = "terraleads_playwrite_state.json"
+    state_file_name = "terraleads_playwright_state.json"
 
     def __init__(
         self,

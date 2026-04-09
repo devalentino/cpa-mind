@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from langchain_core.language_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 
@@ -11,6 +12,7 @@ def build_chat_model(
     model: str,
     temperature: float,
     api_key: str | None,
+    base_url: str | None,
     role: str,
 ) -> BaseChatModel:
     if provider == "openai":
@@ -20,6 +22,7 @@ def build_chat_model(
             api_key=api_key,
             model=model,
             temperature=temperature,
+            base_url=base_url,
             tags=[f"role:{role}"],
         )
 
@@ -30,6 +33,14 @@ def build_chat_model(
             google_api_key=api_key,
             model=model,
             temperature=temperature,
+            tags=[f"role:{role}"],
+        )
+
+    if provider == "ollama":
+        return ChatOllama(
+            model=model,
+            temperature=temperature,
+            base_url=base_url,
             tags=[f"role:{role}"],
         )
 

@@ -18,39 +18,46 @@ from workflow import build_graph
 
 
 def startup():
-    gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+    researcher_provider = os.getenv("RESEARCHER_LLM_PROVIDER", "google")
+    creator_provider = os.getenv("CREATOR_LLM_PROVIDER", "google")
+    compliance_provider = os.getenv("COMPLIANCE_LLM_PROVIDER", "google")
 
     researcher_model = build_chat_model(
-        provider=os.getenv("RESEARCHER_LLM_PROVIDER", "google"),
+        provider=researcher_provider,
         model=os.getenv("RESEARCHER_LLM_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("RESEARCHER_LLM_TEMPERATURE", "0")),
         api_key=(
             os.getenv("RESEARCHER_LLM_API_KEY")
-            or gemini_api_key
+            or os.getenv("GEMINI_API_KEY")
             or os.getenv("OPENAI_API_KEY")
         ),
+        base_url=ollama_base_url if researcher_provider == "ollama" else None,
         role="researcher",
     )
     creator_model = build_chat_model(
-        provider=os.getenv("CREATOR_LLM_PROVIDER", "google"),
+        provider=creator_provider,
         model=os.getenv("CREATOR_LLM_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("CREATOR_LLM_TEMPERATURE", "0.7")),
         api_key=(
             os.getenv("CREATOR_LLM_API_KEY")
-            or gemini_api_key
+            or os.getenv("GEMINI_API_KEY")
             or os.getenv("OPENAI_API_KEY")
         ),
+        base_url=ollama_base_url if creator_provider == "ollama" else None,
         role="creator",
     )
     compliance_officer_model = build_chat_model(
-        provider=os.getenv("COMPLIANCE_LLM_PROVIDER", "google"),
+        provider=compliance_provider,
         model=os.getenv("COMPLIANCE_LLM_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("COMPLIANCE_LLM_TEMPERATURE", "0")),
         api_key=(
             os.getenv("COMPLIANCE_LLM_API_KEY")
-            or gemini_api_key
+            or os.getenv("GEMINI_API_KEY")
             or os.getenv("OPENAI_API_KEY")
         ),
+        base_url=ollama_base_url if compliance_provider == "ollama" else None,
         role="compliance_officer",
     )
 
@@ -59,7 +66,7 @@ def startup():
             TerraleadsOfferParserStrategy(
                 login=os.getenv("TERRALEADS_LOGIN", ""),
                 password=os.getenv("TERRALEADS_PASSWORD", ""),
-                cache_path=os.getenv("PLAYWRIGHT_CACHE_PATH"),
+                cache_path=os.getenv("CACHE_PATH"),
             ),
             UnsupportedOfferParserStrategy(),
         )
