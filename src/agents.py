@@ -75,15 +75,28 @@ def _parse_research_result(text: str) -> tuple[str, str, str]:
     return status, block_reason, report
 
 
+def _select_research_tools(
+    research_tools: list[BaseTool],
+    traffic_source: str,
+) -> list[BaseTool]:
+    filtered_tools: list[BaseTool] = []
+    for tool in research_tools:
+        if tool.name == "FacebookAdsLibraryReader" and not traffic_source == "facebook":
+            continue
+        filtered_tools.append(tool)
+
+    return filtered_tools
+
+
 def build_researcher_node(
     model: BaseChatModel,
     research_tools: list[BaseTool],
 ) -> Callable[[AnalysisState], AnalysisState]:
-    researcher_model = model.bind_tools(research_tools)
-
     def researcher_node(state: AnalysisState) -> AnalysisState:
         offer_url = state["offer_url"]
         traffic_source = state["traffic_source"]
+        available_tools = _select_research_tools(research_tools, traffic_source)
+        researcher_model = model.bind_tools(available_tools)
         messages = list(state.get("messages", []))
         initial_messages: list[SystemMessage | HumanMessage] = []
 
@@ -96,6 +109,18 @@ def build_researcher_node(
                         "audience, market, competitors, and trends. "
                         "Do not call tools blindly. Start with the minimum useful tool, "
                         "and stop early when the offer state makes further research unnecessary. "
+                        "Use OfferReader to inspect the offer page first when you need details "
+                        "such as landing URLs, product framing, country, or targeting clues. "
+                        "If you need landing analysis, extract the landing URLs from the "
+                        "OfferReader output and pass those URLs to LandingReader. "
+                        "Only use traffic-source-specific tools when they are relevant to the "
+                        "current traffic source. "
+                        "When using FacebookAdsLibraryReader, first infer a concrete market "
+                        "search term from the offer, determine the target country, and rewrite "
+                        "the search term in the local language used in that country. "
+                        "For example, for Ukraine use a Ukrainian search phrase and country "
+                        "code UA. Call the tool with that localized search term and country "
+                        "instead of the offer URL. "
                         "If the offer appears disabled, rejected, unavailable, or otherwise not viable, "
                         "explain that and skip irrelevant downstream checks. "
                         "When you are done and no more tools are needed, respond in exactly this format:\n"
@@ -139,9 +164,10 @@ def build_researcher_node(
 def build_research_tools_node(
     research_tools: list[BaseTool],
 ) -> Callable[[AnalysisState], AnalysisState]:
-    research_tool_by_name = {tool.name: tool for tool in research_tools}
-
     def research_tools_node(state: AnalysisState) -> AnalysisState:
+        traffic_source = state["traffic_source"]
+        available_tools = _select_research_tools(research_tools, traffic_source)
+        research_tool_by_name = {tool.name: tool for tool in available_tools}
         messages = list(state.get("messages", []))
         if not messages:
             raise RuntimeError("Research tools node was called without any messages.")

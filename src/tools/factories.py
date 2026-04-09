@@ -23,21 +23,18 @@ def build_offer_reader_tool(offer_reader: OfferReader) -> BaseTool:
 
 def build_landing_reader_tool() -> BaseTool:
     @tool("LandingReader")
-    def landing_reader_tool(offer_url: str) -> dict[str, Any]:
-        """Read and summarize landing page information for the offer."""
-        return LandingReader().run(offer_url)
+    def landing_reader_tool(landing_urls: list[str]) -> dict[str, Any]:
+        """Read and summarize landing page information for landing URLs extracted from the offer."""
+        return LandingReader().run(landing_urls)
 
     return landing_reader_tool
 
 
 def build_facebook_ads_library_reader_tool() -> BaseTool:
     @tool("FacebookAdsLibraryReader")
-    def facebook_ads_library_reader_tool(
-        offer_url: str,
-        traffic_source: str,
-    ) -> dict[str, Any]:
-        """Read competitor and creative pattern information from Facebook Ads Library."""
-        return FacebookAdsLibraryReader().run(offer_url, traffic_source)
+    def facebook_ads_library_reader_tool(search_term: str, country: str) -> dict[str, Any]:
+        """Read active competitor and creative pattern information from Facebook Ads Library for a localized market search term and target country code."""
+        return FacebookAdsLibraryReader().run(search_term, country)
 
     return facebook_ads_library_reader_tool
 

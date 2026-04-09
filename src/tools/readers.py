@@ -6,29 +6,30 @@ from typing import Any
 
 @dataclass(slots=True)
 class LandingReader:
-    def run(self, offer_url: str) -> dict[str, Any]:
+    def run(self, landing_urls: list[str]) -> dict[str, Any]:
         return {
-            "offer_url": offer_url,
+            "landing_urls": landing_urls,
             "landings": [
                 {
-                    "url": "TODO: implement landing URL collection.",
+                    "url": landing_url,
                     "summary": "TODO: implement landing content analysis.",
                 }
+                for landing_url in landing_urls
             ],
         }
 
 
 @dataclass(slots=True)
 class FacebookAdsLibraryReader:
-    def run(self, offer_url: str, traffic_source: str) -> dict[str, Any]:
+    def run(self, search_term: str, country: str) -> dict[str, Any]:
         return {
-            "offer_url": offer_url,
-            "traffic_source": traffic_source,
+            "search_term": search_term,
+            "country": country,
             "competitors": [
-                "TODO: implement competitor discovery via Facebook Ads Library."
+                "TODO: implement competitor discovery in Facebook Ads Library for this search term."
             ],
             "creative_patterns": [
-                "TODO: implement competitor creative pattern analysis."
+                "TODO: implement active ad creative pattern analysis for this search term."
             ],
         }
 
