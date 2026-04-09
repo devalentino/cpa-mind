@@ -23,9 +23,9 @@ def build_offer_reader_tool(offer_reader: OfferReader) -> BaseTool:
 
 def build_landing_reader_tool() -> BaseTool:
     @tool("LandingReader")
-    def landing_reader_tool(landing_urls: list[str]) -> dict[str, Any]:
-        """Read and summarize landing page information for landing URLs extracted from the offer."""
-        return LandingReader().run(landing_urls)
+    def landing_reader_tool(landing_url: str) -> dict[str, Any]:
+        """Read and summarize landing page information for a single landing URL extracted from the offer."""
+        return LandingReader().run(landing_url)
 
     return landing_reader_tool
 
