@@ -20,7 +20,7 @@ def build_offer_reader_tool(offer_reader: OfferReader) -> BaseTool:
 
 def build_facebook_ads_library_reader_tool() -> BaseTool:
     @tool("FacebookAdsLibraryReader")
-    def facebook_ads_library_reader_tool(search_term: str, country: str) -> str:
+    def facebook_ads_library_reader_tool(search_term: str, country: str) -> list[dict]:
         """Read active competitor and creative pattern information from Facebook Ads Library for a localized market search term and target country code."""
         return FacebookAdsLibraryReader().run(search_term, country)
 

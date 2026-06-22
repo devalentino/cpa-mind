@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, is_dataclass
 from collections.abc import Callable
+from uuid import uuid4
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -75,6 +76,20 @@ def _parse_research_result(text: str) -> tuple[str, str, str]:
     return status, block_reason, report
 
 
+def _build_tool_call_message(tool_name: str, args: dict[str, object]) -> AIMessage:
+    return AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": tool_name,
+                "args": args,
+                "id": f"toolu_{uuid4().hex}",
+                "type": "tool_call",
+            }
+        ],
+    )
+
+
 def _select_research_tools(
     research_tools: list[BaseTool],
     traffic_source: str,
@@ -98,6 +113,7 @@ def build_researcher_node(
         available_tools = _select_research_tools(research_tools, traffic_source)
         researcher_model = model.bind_tools(available_tools)
         messages = list(state.get("messages", []))
+        tool_outputs = dict(state.get("research_tool_outputs", {}))
         initial_messages: list[SystemMessage | HumanMessage] = []
 
         if not messages:
@@ -109,17 +125,27 @@ def build_researcher_node(
                         "audience, market, competitors, and trends. "
                         "Do not call tools blindly. Start with the minimum useful tool, "
                         "and stop early when the offer state makes further research unnecessary. "
+                        "OfferReader is a mandatory first step. "
                         "Use OfferReader to inspect the offer page, prelandings, and landings "
                         "when you need details such as product framing, country, targeting clues, "
                         "and search terms. "
                         "Only use traffic-source-specific tools when they are relevant to the "
                         "current traffic source. "
+                        "For facebook traffic, FacebookAdsLibraryReader is mandatory before a final "
+                        "decision. "
                         "When using FacebookAdsLibraryReader, derive the search term from "
                         "OfferReader landing or prelanding output, not directly from the offer. "
                         "Use the landing analysis to identify the best concrete market phrase, "
                         "determine the target country, and express the search term in the local "
                         "language used in that country. For example, for Ukraine use a Ukrainian "
                         "search phrase and country code UA. "
+                        "For facebook traffic, continue only if competitors promote the exact same "
+                        "offer, meaning the same brand and the same exact model. "
+                        "If competitors promote a different product, a different brand, or a "
+                        "different model, return BLOCKED and stop without using GoogleTrendsReader. "
+                        "Use GoogleTrendsReader only after exact-match competitor analysis confirms "
+                        "the same offer and the offer still looks viable. "
+                        "If trend demand is weak or not trending enough, return BLOCKED. "
                         "Call the tool with that localized search term and country. "
                         "If the offer appears disabled, rejected, unavailable, or otherwise not viable, "
                         "explain that and skip irrelevant downstream checks. "
@@ -138,9 +164,58 @@ def build_researcher_node(
                     )
                 ),
             ]
-            messages = list(initial_messages)
+            return {
+                "messages": [
+                    *initial_messages,
+                    _build_tool_call_message("OfferReader", {"offer_url": offer_url}),
+                ],
+                "revision_count": state.get("revision_count", 0),
+                "max_revisions": state.get("max_revisions", 2),
+            }
+
+        if "OfferReader" not in tool_outputs:
+            return {
+                "messages": [
+                    _build_tool_call_message("OfferReader", {"offer_url": offer_url}),
+                ],
+                "revision_count": state.get("revision_count", 0),
+                "max_revisions": state.get("max_revisions", 2),
+            }
 
         response = researcher_model.invoke(messages)
+
+        if not getattr(response, "tool_calls", None) and traffic_source == "facebook":
+            if "FacebookAdsLibraryReader" not in tool_outputs:
+                reminder = HumanMessage(
+                    content=(
+                        "For facebook traffic, you must use FacebookAdsLibraryReader before "
+                        "making a final decision. Determine whether competitors promote the exact "
+                        "same offer: the same brand and the same exact model."
+                    )
+                )
+                retry_response = researcher_model.invoke([*messages, response, reminder])
+                return {
+                    "messages": [response, reminder, retry_response],
+                    "revision_count": state.get("revision_count", 0),
+                    "max_revisions": state.get("max_revisions", 2),
+                }
+
+            research_status, _, _ = _parse_research_result(_message_text(response))
+            if research_status == "ready_for_creation" and "GoogleTrendsReader" not in tool_outputs:
+                reminder = HumanMessage(
+                    content=(
+                        "You cannot return READY_FOR_CREATION for facebook traffic until "
+                        "GoogleTrendsReader has been used after confirming exact-match competitors. "
+                        "If competitors are not the exact same brand and model, return BLOCKED."
+                    )
+                )
+                retry_response = researcher_model.invoke([*messages, response, reminder])
+                return {
+                    "messages": [response, reminder, retry_response],
+                    "revision_count": state.get("revision_count", 0),
+                    "max_revisions": state.get("max_revisions", 2),
+                }
+
         state_update: AnalysisState = {
             "messages": [*initial_messages, response],
             "revision_count": state.get("revision_count", 0),
